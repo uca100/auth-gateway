@@ -47,14 +47,22 @@
             <span class="text-xs bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded-full">telegram only</span>
             {% endif %}
           </div>
-          {% if user.username != admin_user %}
-          <button onclick="removeUser('{{ user.username }}')"
-            class="text-gray-600 hover:text-red-400 text-xs transition-colors">
-            Remove
-          </button>
-          {% else %}
-          <span class="text-gray-700 text-xs">you</span>
-          {% endif %}
+          <div class="flex items-center gap-3">
+            {% if user.totp_secret %}
+            <button onclick="revokeTotp('{{ user.username }}')"
+              class="text-gray-600 hover:text-orange-400 text-xs transition-colors">
+              Revoke App
+            </button>
+            {% endif %}
+            {% if user.username != admin_user %}
+            <button onclick="removeUser('{{ user.username }}')"
+              class="text-gray-600 hover:text-red-400 text-xs transition-colors">
+              Remove
+            </button>
+            {% else %}
+            <span class="text-gray-600 text-xs">you</span>
+            {% endif %}
+          </div>
         </div>
         {% else %}
         <div class="px-5 py-4 text-sm text-gray-500">No users yet.</div>
@@ -86,6 +94,24 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed');
         input.value = '';
+        location.reload();
+      } catch (e) {
+        showError(errEl, e.message);
+      }
+    }
+
+    async function revokeTotp(username) {
+      if (!confirm(`Revoke authenticator app for ${username}? They'll use Telegram next login.`)) return;
+      const errEl = document.getElementById('err-remove');
+      errEl.classList.add('hidden');
+      try {
+        const res = await fetch('/auth/admin/revoke-totp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
         location.reload();
       } catch (e) {
         showError(errEl, e.message);

@@ -354,6 +354,18 @@ def admin_remove_user():
     return jsonify({"ok": True})
 
 
+@bp.route("/admin/revoke-totp", methods=["POST"])
+def admin_revoke_totp():
+    if not _is_admin():
+        return jsonify({"error": "Forbidden"}), 403
+    username = (request.form.get("username") or "").strip()
+    if not username:
+        return jsonify({"error": "Username required"}), 400
+    delete_totp_secret(username)
+    log.info("Admin revoked TOTP for user=%s", username)
+    return jsonify({"ok": True})
+
+
 @bp.route("/check")
 def auth_check():
     """nginx auth_request subrequest endpoint — returns 200 with X-Auth-User or 401."""
