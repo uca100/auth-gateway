@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auth Gateway — Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+</head>
+<body class="dark bg-gray-950 text-gray-100 min-h-screen p-6">
+  <div class="max-w-lg mx-auto">
+
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-2xl font-bold">User Management</h1>
+        <p class="text-gray-400 text-sm mt-0.5">Allowed users across all apps</p>
+      </div>
+      <a href="/alwayson/" class="text-gray-500 hover:text-gray-300 text-sm transition-colors">← Back</a>
+    </div>
+
+    <!-- Add user -->
+    <div class="bg-gray-900 rounded-2xl p-5 border border-gray-800 mb-6">
+      <label class="block text-sm text-gray-400 mb-2">Add user</label>
+      <div class="flex gap-2">
+        <input id="new-username" type="text" placeholder="username"
+          class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-600" />
+        <button onclick="addUser()"
+          class="bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors">
+          Add
+        </button>
+      </div>
+      <p id="err-add" class="text-red-400 text-xs mt-2 hidden"></p>
+    </div>
+
+    <!-- User list -->
+    <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+      <div id="user-list">
+        {% for user in users %}
+        <div id="row-{{ user.username }}" class="flex items-center justify-between px-5 py-3.5
+             {% if not loop.last %}border-b border-gray-800{% endif %}">
+          <div class="flex items-center gap-3">
+            <span class="font-medium text-sm">{{ user.username }}</span>
+            {% if user.totp_secret %}
+            <span class="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded-full">app set up</span>
+            {% else %}
+            <span class="text-xs bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded-full">telegram only</span>
+            {% endif %}
+          </div>
+          {% if user.username != admin_user %}
+          <button onclick="removeUser('{{ user.username }}')"
+            class="text-gray-600 hover:text-red-400 text-xs transition-colors">
+            Remove
+          </button>
+          {% else %}
+          <span class="text-gray-700 text-xs">you</span>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="px-5 py-4 text-sm text-gray-500">No users yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <p id="err-remove" class="text-red-400 text-xs mt-3 hidden"></p>
+
+    <p class="text-xs text-gray-700 mt-6 text-center">auth-gateway v{{ version }}</p>
+
+  </div>
+
+  <script>
+    async function addUser() {
+      const input = document.getElementById('new-username');
+      const username = input.value.trim().toLowerCase();
+      const errEl = document.getElementById('err-add');
+      errEl.classList.add('hidden');
+
+      if (!username) { showError(errEl, 'Enter a username'); return; }
+
+      try {
+        const res = await fetch('/auth/admin/add-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        input.value = '';
+        location.reload();
+      } catch (e) {
+        showError(errEl, e.message);
+      }
+    }
+
+    async function removeUser(username) {
+      const errEl = document.getElementById('err-remove');
+      errEl.classList.add('hidden');
+      try {
+        const res = await fetch('/auth/admin/remove-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        document.getElementById('row-' + username)?.remove();
+      } catch (e) {
+        showError(errEl, e.message);
+      }
+    }
+
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    document.getElementById('new-username').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addUser();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+</head>
+<body class="dark bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-sm px-6">
+
+    <div class="mb-8 text-center">
+      <div class="text-4xl mb-2">🔐</div>
+      <h1 class="text-2xl font-bold tracking-tight">Sign In</h1>
+      <p class="text-gray-400 text-sm mt-1">Authenticate to access your apps</p>
+    </div>
+
+    <div class="bg-gray-900 rounded-2xl p-6 shadow-xl border border-gray-800">
+
+      <!-- Step 1: username -->
+      <div id="step-username">
+        <label class="block text-sm text-gray-400 mb-1">Username</label>
+        <input id="username" type="text"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-600"
+          placeholder="Enter your username"
+          autocomplete="username" />
+        <button id="btn-continue" onclick="continueLogin()"
+          class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-medium
+                 rounded-lg py-2.5 text-sm transition-colors">
+          Continue
+        </button>
+        <p id="err-username" class="text-red-400 text-xs mt-2 hidden"></p>
+      </div>
+
+      <!-- Step 2: Choose auth method -->
+      <div id="step-choose" class="hidden">
+        <p class="text-sm text-gray-400 mb-4 text-center">How would you like to verify?</p>
+        <p id="first-timer-note" class="text-xs text-yellow-400 mb-3 text-center hidden">
+          First time? Verify via Telegram — you can set up the app after.
+        </p>
+
+        <div class="space-y-3">
+          <button id="btn-totp" onclick="useAuthenticator()"
+            class="w-full bg-gray-800 hover:bg-gray-750 border border-gray-700
+                   text-white font-medium rounded-lg py-3 px-4 text-sm
+                   transition-colors flex items-center gap-3">
+            <span class="text-xl">📱</span>
+            <span>Use Authenticator App</span>
+          </button>
+
+          <button id="btn-msg" onclick="useMessage()"
+            class="w-full bg-gray-800 hover:bg-gray-750 border border-gray-700
+                   text-white font-medium rounded-lg py-3 px-4 text-sm
+                   transition-colors flex items-center gap-3">
+            <span class="text-xl">💬</span>
+            <span>Send Code via Message</span>
+          </button>
+        </div>
+
+        <button onclick="resetToUsername()"
+          class="mt-4 w-full text-gray-500 hover:text-gray-300 text-xs transition-colors">
+          Different username
+        </button>
+        <p id="err-choose" class="text-red-400 text-xs mt-2 hidden text-center"></p>
+      </div>
+
+      <!-- Step 3a: TOTP verification -->
+      <div id="step-totp" class="hidden">
+        <div class="text-center mb-4">
+          <div class="text-2xl mb-2">📱</div>
+          <p class="text-sm text-gray-400">Enter the 6-digit code from your authenticator</p>
+        </div>
+        <label class="block text-sm text-gray-400 mb-1">6-digit code</label>
+        <input id="totp-code" type="text" inputmode="numeric" maxlength="6" placeholder="123456"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm
+                 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-blue-500
+                 placeholder-gray-600"
+          autocomplete="one-time-code" />
+        <button id="btn-verify-totp" onclick="verifyTotp()"
+          class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-medium
+                 rounded-lg py-2.5 text-sm transition-colors">
+          Verify
+        </button>
+        <p id="err-totp" class="text-red-400 text-xs mt-2 hidden"></p>
+        <button onclick="backToChoose()"
+          class="mt-3 w-full text-gray-500 hover:text-gray-300 text-xs transition-colors">
+          ← Choose different method
+        </button>
+      </div>
+
+      <!-- Step 3b: Message OTP verification -->
+      <div id="step-otp" class="hidden">
+        <div class="text-center mb-4">
+          <div class="text-2xl mb-2">💬</div>
+          <p id="sent-msg" class="text-sm text-green-400">Code sent</p>
+        </div>
+        <label class="block text-sm text-gray-400 mb-1">6-digit code</label>
+        <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="123456"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm
+                 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-blue-500
+                 placeholder-gray-600"
+          autocomplete="one-time-code" />
+        <button id="btn-verify-otp" onclick="verifyCode()"
+          class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-medium
+                 rounded-lg py-2.5 text-sm transition-colors">
+          Verify
+        </button>
+        <p id="err-otp" class="text-red-400 text-xs mt-2 hidden"></p>
+        <div class="mt-3 flex gap-3">
+          <button onclick="resendCode()"
+            class="flex-1 text-gray-500 hover:text-gray-300 text-xs transition-colors">
+            Send again
+          </button>
+          <button onclick="backToChoose()"
+            class="flex-1 text-gray-500 hover:text-gray-300 text-xs transition-colors">
+            ← Different method
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentUsername = '';
+    let chosenMethod = null;
+
+    async function continueLogin() {
+      const username = document.getElementById('username').value.trim();
+      const errEl = document.getElementById('err-username');
+      errEl.classList.add('hidden');
+
+      if (!username) {
+        showError(errEl, 'Please enter a username');
+        return;
+      }
+
+      const btn = document.getElementById('btn-continue');
+      btn.textContent = 'Checking…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/auth/request-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+
+        const totpRes = await fetch('/auth/check-totp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username })
+        });
+        const totpData = await totpRes.json();
+        const hasTotp = totpData.has_totp ?? false;
+
+        document.getElementById('btn-totp').classList.toggle('hidden', !hasTotp);
+        document.getElementById('first-timer-note').classList.toggle('hidden', hasTotp);
+
+        currentUsername = username;
+        showStep('choose');
+      } catch (e) {
+        showError(errEl, e.message);
+        btn.textContent = 'Continue';
+        btn.disabled = false;
+      }
+    }
+
+    function showStep(step) {
+      ['username', 'choose', 'totp', 'otp'].forEach(s => {
+        document.getElementById('step-' + s).classList.add('hidden');
+      });
+      document.getElementById('step-' + step).classList.remove('hidden');
+
+      if (step === 'totp') {
+        setTimeout(() => document.getElementById('totp-code').focus(), 50);
+      } else if (step === 'otp') {
+        setTimeout(() => document.getElementById('otp').focus(), 50);
+      }
+    }
+
+    async function useAuthenticator() {
+      try {
+        const res = await fetch('/auth/check-totp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: currentUsername })
+        });
+        const data = await res.json();
+        if (data.has_totp) {
+          chosenMethod = 'totp';
+          showStep('totp');
+        } else {
+          window.location.href = '/auth/setup-totp';
+        }
+      } catch (e) {
+        showError(document.getElementById('err-choose'), 'Failed to check authenticator status');
+      }
+    }
+
+    async function useMessage() {
+      chosenMethod = 'otp';
+      const sentMsg = document.getElementById('sent-msg');
+      sentMsg.textContent = 'Sending…';
+      sentMsg.className = 'text-sm text-gray-400';
+      showStep('otp');
+
+      try {
+        await fetch('/auth/request-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: currentUsername })
+        });
+        const res = await fetch('/auth/send-otp', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        sentMsg.textContent = 'Code sent';
+        sentMsg.className = 'text-sm text-green-400';
+      } catch (e) {
+        sentMsg.textContent = '❌ ' + e.message;
+        sentMsg.className = 'text-sm text-red-400';
+      }
+    }
+
+    async function verifyTotp() {
+      const code = document.getElementById('totp-code').value.trim();
+      const errEl = document.getElementById('err-totp');
+      errEl.classList.add('hidden');
+
+      if (code.length !== 6) {
+        showError(errEl, 'Enter the 6-digit code');
+        return;
+      }
+
+      const btn = document.getElementById('btn-verify-totp');
+      btn.textContent = 'Verifying…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/auth/verify-totp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ code })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Invalid code');
+        window.location.href = data.redirect || '/alwayson/';
+      } catch (e) {
+        showError(errEl, e.message);
+        btn.textContent = 'Verify';
+        btn.disabled = false;
+      }
+    }
+
+    async function verifyCode() {
+      const otp = document.getElementById('otp').value.trim();
+      const errEl = document.getElementById('err-otp');
+      errEl.classList.add('hidden');
+
+      if (otp.length !== 6) {
+        showError(errEl, 'Enter the 6-digit code');
+        return;
+      }
+
+      const btn = document.getElementById('btn-verify-otp');
+      btn.textContent = 'Verifying…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: currentUsername, otp })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Invalid code');
+        window.location.href = data.redirect || '/alwayson/';
+      } catch (e) {
+        showError(errEl, e.message);
+        btn.textContent = 'Verify';
+        btn.disabled = false;
+      }
+    }
+
+    async function resendCode() {
+      const sentMsg = document.getElementById('sent-msg');
+      sentMsg.textContent = 'Sending…';
+      sentMsg.className = 'text-sm text-gray-400';
+      try {
+        await fetch('/auth/request-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: currentUsername })
+        });
+        const res = await fetch('/auth/send-otp', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        sentMsg.textContent = '✅ Code sent';
+        sentMsg.className = 'text-sm text-green-400';
+        document.getElementById('otp').value = '';
+        setTimeout(() => document.getElementById('otp').focus(), 50);
+      } catch (e) {
+        sentMsg.textContent = '❌ ' + e.message;
+        sentMsg.className = 'text-sm text-red-400';
+      }
+    }
+
+    function backToChoose() {
+      chosenMethod = null;
+      showStep('choose');
+    }
+
+    function resetToUsername() {
+      chosenMethod = null;
+      currentUsername = '';
+      showStep('username');
+      document.getElementById('btn-continue').textContent = 'Continue';
+      document.getElementById('btn-continue').disabled = false;
+    }
+
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (!document.getElementById('step-totp').classList.contains('hidden')) {
+        verifyTotp();
+      } else if (!document.getElementById('step-otp').classList.contains('hidden')) {
+        verifyCode();
+      } else if (!document.getElementById('step-username').classList.contains('hidden')) {
+        continueLogin();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Set Up Authenticator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+</head>
+<body class="dark bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-sm px-6">
+
+    <div class="mb-8 text-center">
+      <div class="text-4xl mb-2">🔐</div>
+      <h1 class="text-2xl font-bold tracking-tight">Set Up Authenticator</h1>
+      <p class="text-gray-400 text-sm mt-1">Scan this QR code with your authenticator app</p>
+    </div>
+
+    <div class="bg-gray-900 rounded-2xl p-6 shadow-xl border border-gray-800">
+
+      <div class="text-center mb-6">
+        <div id="qrcode" class="inline-block bg-white p-3 rounded-xl"></div>
+      </div>
+
+      <div class="mb-6">
+        <label class="block text-sm text-gray-400 mb-1">Manual entry code</label>
+        <div class="bg-gray-800 rounded-lg px-4 py-2 text-sm font-mono text-center tracking-wider break-all text-gray-300">
+          {{ secret }}
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <label class="block text-sm text-gray-400 mb-1">Verify with code</label>
+        <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="123456"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm
+                 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-blue-500
+                 placeholder-gray-600"
+          autocomplete="one-time-code" />
+        <p id="err-code" class="text-red-400 text-xs mt-2 hidden"></p>
+      </div>
+
+      <button id="btn-verify" onclick="verifyCode()"
+        class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium
+               rounded-lg py-2.5 text-sm transition-colors">
+        Verify & Enable
+      </button>
+
+      <p class="text-xs text-gray-500 mt-4 text-center">
+        Use Google Authenticator, Authy, or 1Password
+      </p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script>
+    QRCode.toDataURL({{ uri | tojson }}, { width: 200, margin: 1 }, (err, url) => {
+      if (!err) {
+        document.getElementById('qrcode').innerHTML = `<img src="${url}" alt="QR Code" class="w-48 h-48" />`;
+      }
+    });
+
+    async function verifyCode() {
+      const code = document.getElementById('code').value.trim();
+      const errEl = document.getElementById('err-code');
+      errEl.classList.add('hidden');
+
+      if (code.length !== 6) {
+        showError(errEl, 'Enter the 6-digit code');
+        return;
+      }
+
+      const btn = document.getElementById('btn-verify');
+      btn.textContent = 'Verifying…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/auth/verify-totp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ code })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Verification failed');
+        window.location.href = data.redirect || '/alwayson/';
+      } catch (e) {
+        showError(errEl, e.message);
+        btn.textContent = 'Verify & Enable';
+        btn.disabled = false;
+      }
+    }
+
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') verifyCode();
+    });
+  </script>
+</body>
+</html>

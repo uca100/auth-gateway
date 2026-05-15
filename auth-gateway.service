@@ -1,0 +1,18 @@
+[Unit]
+Description=auth-gateway — unified authentication service
+After=network.target
+
+[Service]
+User=uri
+WorkingDirectory=/usr/local/bin/auth-gateway
+EnvironmentFile=/usr/local/bin/auth-gateway.env
+ExecStart=/usr/local/bin/auth-gateway/venv/bin/gunicorn \
+    --bind 0.0.0.0:4001 \
+    --workers 2 \
+    --timeout 60 \
+    app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
