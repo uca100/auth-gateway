@@ -18,7 +18,7 @@ from flask import (
     render_template, redirect, jsonify
 )
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
