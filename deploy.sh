@@ -9,7 +9,7 @@ echo "==> Deploying auth-gateway to Pi5 ($PI5)"
 
 # 1. Create app directory and copy files
 ssh "$PI5" "sudo mkdir -p $APP_DIR && sudo chown uri:uri $APP_DIR"
-scp app.py "$PI5:$APP_DIR/"
+scp app.py migrate.py "$PI5:$APP_DIR/"
 scp requirements.txt "$PI5:$APP_DIR/"
 scp -r templates "$PI5:$APP_DIR/"
 
