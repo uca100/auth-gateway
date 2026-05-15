@@ -39,22 +39,34 @@
         {% for user in users %}
         <div id="row-{{ user.username }}" class="flex items-center justify-between px-5 py-3.5
              {% if not loop.last %}border-b border-gray-800{% endif %}">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 flex-wrap">
             <span class="font-medium text-sm">{{ user.username }}</span>
+            {% if user.username == admin_user %}
+            <span class="text-xs bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded-full">primary admin</span>
+            {% elif user.is_admin %}
+            <span id="role-badge-{{ user.username }}" class="text-xs bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded-full">admin</span>
+            {% else %}
+            <span id="role-badge-{{ user.username }}" class="text-xs bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full">user</span>
+            {% endif %}
             {% if user.totp_secret %}
             <span class="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded-full">app set up</span>
             {% else %}
             <span class="text-xs bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded-full">telegram only</span>
             {% endif %}
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 shrink-0 ml-3">
             {% if user.totp_secret %}
             <button onclick="revokeTotp('{{ user.username }}')"
-              class="text-gray-600 hover:text-orange-400 text-xs transition-colors">
+              class="text-gray-600 hover:text-orange-400 text-xs transition-colors whitespace-nowrap">
               Revoke App
             </button>
             {% endif %}
             {% if user.username != admin_user %}
+            <button id="role-btn-{{ user.username }}"
+              onclick="toggleRole('{{ user.username }}', {{ 'true' if user.is_admin else 'false' }})"
+              class="text-gray-600 hover:text-blue-400 text-xs transition-colors whitespace-nowrap">
+              {{ 'Make User' if user.is_admin else 'Make Admin' }}
+            </button>
             <button onclick="removeUser('{{ user.username }}')"
               class="text-gray-600 hover:text-red-400 text-xs transition-colors">
               Remove
@@ -95,6 +107,39 @@
         if (!res.ok) throw new Error(data.error || 'Failed');
         input.value = '';
         location.reload();
+      } catch (e) {
+        showError(errEl, e.message);
+      }
+    }
+
+    async function toggleRole(username, currentlyAdmin) {
+      const newRole = currentlyAdmin ? 'user' : 'admin';
+      const label   = currentlyAdmin ? 'regular user' : 'admin';
+      if (!confirm(`Change ${username} to ${label}?`)) return;
+      const errEl = document.getElementById('err-remove');
+      errEl.classList.add('hidden');
+      try {
+        const res = await fetch('/auth/admin/set-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username, role: newRole })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        // Update badge and button in-place without full reload
+        const badge = document.getElementById('role-badge-' + username);
+        const btn   = document.getElementById('role-btn-'  + username);
+        if (newRole === 'admin') {
+          badge.textContent = 'admin';
+          badge.className = 'text-xs bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded-full';
+          btn.textContent = 'Make User';
+          btn.setAttribute('onclick', `toggleRole('${username}', true)`);
+        } else {
+          badge.textContent = 'user';
+          badge.className = 'text-xs bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full';
+          btn.textContent = 'Make Admin';
+          btn.setAttribute('onclick', `toggleRole('${username}', false)`);
+        }
       } catch (e) {
         showError(errEl, e.message);
       }

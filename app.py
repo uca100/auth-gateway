@@ -106,9 +106,16 @@ def delete_totp_secret(username: str) -> None:
 
 def list_users() -> list[dict]:
     rows = get_db().execute(
-        "SELECT username, totp_secret FROM users ORDER BY username"
+        "SELECT username, totp_secret, is_admin FROM users ORDER BY username"
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def db_set_role(username: str, is_admin: int) -> None:
+    get_db().execute(
+        "UPDATE users SET is_admin = ? WHERE username = ?", (is_admin, username)
+    )
+    get_db().commit()
 
 
 def db_add_user(username: str) -> None:
@@ -167,11 +174,15 @@ def _send_telegram(text: str) -> None:
 
 
 def _is_admin() -> bool:
-    return (
-        bool(session.get("authenticated"))
-        and not _session_expired()
-        and session.get("username") == ADMIN_USER
-    )
+    if not bool(session.get("authenticated")) or _session_expired():
+        return False
+    username = session.get("username")
+    if username == ADMIN_USER:
+        return True
+    row = get_db().execute(
+        "SELECT is_admin FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    return bool(row and row["is_admin"])
 
 
 def _safe_next(url: str) -> str:
@@ -363,6 +374,21 @@ def admin_revoke_totp():
         return jsonify({"error": "Username required"}), 400
     delete_totp_secret(username)
     log.info("Admin revoked TOTP for user=%s", username)
+    return jsonify({"ok": True})
+
+
+@bp.route("/admin/set-role", methods=["POST"])
+def admin_set_role():
+    if not _is_admin():
+        return jsonify({"error": "Forbidden"}), 403
+    username = (request.form.get("username") or "").strip()
+    role     = (request.form.get("role") or "").strip()
+    if not username or role not in ("admin", "user"):
+        return jsonify({"error": "username and role (admin|user) required"}), 400
+    if username == ADMIN_USER:
+        return jsonify({"error": "Cannot change primary admin role"}), 400
+    db_set_role(username, 1 if role == "admin" else 0)
+    log.info("Admin set role=%s for user=%s", role, username)
     return jsonify({"ok": True})
 
 
