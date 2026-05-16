@@ -84,6 +84,32 @@
 
     <p id="err-remove" class="text-red-400 text-xs mt-3 hidden"></p>
 
+    <!-- Session timeout -->
+    <div class="bg-gray-900 rounded-2xl p-5 border border-gray-800 mt-6">
+      <h2 class="text-sm font-medium mb-1">Session timeout</h2>
+      <p class="text-xs text-gray-500 mb-3">How long users stay logged in before re-authentication is required.</p>
+      <div class="flex gap-2">
+        <select id="session-ttl"
+          class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="3600"    {% if session_ttl == 3600    %}selected{% endif %}>1 hour</option>
+          <option value="14400"   {% if session_ttl == 14400   %}selected{% endif %}>4 hours</option>
+          <option value="28800"   {% if session_ttl == 28800   %}selected{% endif %}>8 hours</option>
+          <option value="86400"   {% if session_ttl == 86400   %}selected{% endif %}>1 day</option>
+          <option value="604800"  {% if session_ttl == 604800  %}selected{% endif %}>7 days</option>
+          <option value="2592000" {% if session_ttl == 2592000 %}selected{% endif %}>30 days</option>
+          {% if session_ttl not in [3600, 14400, 28800, 86400, 604800, 2592000] %}
+          <option value="{{ session_ttl }}" selected>Custom ({{ session_ttl }}s)</option>
+          {% endif %}
+        </select>
+        <button onclick="saveSessionTtl()"
+          class="bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors">
+          Save
+        </button>
+      </div>
+      <p id="msg-ttl" class="text-xs mt-2 hidden"></p>
+    </div>
+
     <p class="text-xs text-gray-700 mt-6 text-center">auth-gateway v{{ version }}</p>
 
   </div>
@@ -177,6 +203,28 @@
         document.getElementById('row-' + username)?.remove();
       } catch (e) {
         showError(errEl, e.message);
+      }
+    }
+
+    async function saveSessionTtl() {
+      const ttl = document.getElementById('session-ttl').value;
+      const msgEl = document.getElementById('msg-ttl');
+      msgEl.classList.add('hidden');
+      try {
+        const res = await fetch('/auth/admin/set-session-ttl', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ ttl })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        msgEl.textContent = 'Saved.';
+        msgEl.className = 'text-xs mt-2 text-green-400';
+        msgEl.classList.remove('hidden');
+      } catch (e) {
+        msgEl.textContent = e.message;
+        msgEl.className = 'text-xs mt-2 text-red-400';
+        msgEl.classList.remove('hidden');
       }
     }
 

@@ -18,7 +18,7 @@ from flask import (
     render_template, redirect, jsonify
 )
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -67,12 +67,32 @@ def init_db() -> None:
             code       TEXT NOT NULL,
             expires_at REAL NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
     """)
+    get_db().commit()
+
+
+def get_setting(key: str, default: str | None = None) -> str | None:
+    row = get_db().execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_setting(key: str, value: str) -> None:
+    get_db().execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
     get_db().commit()
 
 
 init_db()
 log.info("Database ready: %s", DB_FILE)
+
+# Allow DB to override the env-var SESSION_TTL (set via admin panel)
+_db_ttl = get_setting("session_ttl")
+if _db_ttl is not None:
+    SESSION_TTL = int(_db_ttl)
+    app.permanent_session_lifetime = timedelta(seconds=SESSION_TTL)
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -338,7 +358,7 @@ def admin():
     if not _is_admin():
         return redirect("/auth/login")
     users = list_users()
-    return render_template("admin.html", users=users, admin_user=ADMIN_USER, version=VERSION)
+    return render_template("admin.html", users=users, admin_user=ADMIN_USER, version=VERSION, session_ttl=SESSION_TTL)
 
 
 @bp.route("/admin/add-user", methods=["POST"])
@@ -375,6 +395,24 @@ def admin_revoke_totp():
     delete_totp_secret(username)
     log.info("Admin revoked TOTP for user=%s", username)
     return jsonify({"ok": True})
+
+
+@bp.route("/admin/set-session-ttl", methods=["POST"])
+def admin_set_session_ttl():
+    global SESSION_TTL
+    if not _is_admin():
+        return jsonify({"error": "Forbidden"}), 403
+    try:
+        ttl = int(request.form.get("ttl", "0"))
+    except ValueError:
+        return jsonify({"error": "Invalid value"}), 400
+    if not (300 <= ttl <= 60 * 60 * 24 * 365):
+        return jsonify({"error": "TTL must be between 5 minutes and 1 year"}), 400
+    SESSION_TTL = ttl
+    app.permanent_session_lifetime = timedelta(seconds=ttl)
+    set_setting("session_ttl", str(ttl))
+    log.info("Admin updated SESSION_TTL to %d seconds", ttl)
+    return jsonify({"ok": True, "session_ttl": ttl})
 
 
 @bp.route("/admin/set-role", methods=["POST"])

@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [1.2.0] - 2026-05-16
+### Added
+- Session timeout is now admin-configurable via the admin panel (dropdown: 1h / 4h / 8h / 1d / 7d / 30d)
+- New `settings` table in SQLite persists the chosen TTL across restarts
+- New POST /auth/admin/set-session-ttl route updates SESSION_TTL live (no restart needed)
+- Default session timeout changed from 4 hours to 7 days
+
 ## [1.1.0] - 2026-05-15
 ### Added
 - Admin can revoke any user's TOTP authenticator app via new POST /auth/admin/revoke-totp
