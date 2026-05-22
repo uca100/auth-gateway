@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+
+## [Unreleased] - 2026-05-23
+
+### Added
+- install.sh: full idempotent setup script for fresh server restore
+- Mirrored to ~/projects/install-scripts/auth-gateway.sh
+- Architecture diagram and folder structure added to Notion project page
+
 ## [1.2.0] - 2026-05-16
 ### Added
 - Session timeout is now admin-configurable via the admin panel (dropdown: 1h / 4h / 8h / 1d / 7d / 30d)
